@@ -32,6 +32,7 @@ RDEPENDS_${PN} = " \
     xenclient-toolstack \
     xenclient-input-daemon \
     xenclient-dom0-tweaks \
+    status-report \
     xenclient-splash-images \
     xenclient-config-access \
     xenclient-cryptdisks \

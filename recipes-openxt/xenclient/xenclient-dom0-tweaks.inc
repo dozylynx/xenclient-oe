@@ -20,8 +20,6 @@ SRC_URI = "file://enter-s3.sh \
 	   file://blacklist-nvidiafb.conf \
 	   file://r8168.conf \
 	   file://create-ndvm \
-	   file://status-report \
-	   file://status-tool \
 	   file://status-upload \
 	   file://null.iso \
 	   file://set_platform_username \
@@ -94,10 +92,6 @@ do_install () {
 		${D}/usr/share/null.iso
 
 	install -d ${D}/usr/bin
-	install -m 0755 ${WORKDIR}/status-report \
-		${D}/usr/bin/status-report
-	install -m 0755 ${WORKDIR}/status-tool \
-		${D}/usr/bin/status-tool
 	install -m 0755 ${WORKDIR}/status-upload \
 		${D}/usr/bin/status-upload
 	install -m 0755 ${WORKDIR}/set_platform_username \
