@@ -112,9 +112,9 @@ index 6237ae1..e2acaff 100644
 --- a/xen/include/xen/sched.h
 +++ b/xen/include/xen/sched.h
 @@ -391,6 +391,10 @@ struct domain
+
      /*v4v*/
-     rwlock_t v4v_lock;
-     struct v4v_domain	*v4v;
+     struct v4v_domain *v4v;
 +
 +    unsigned long prev_mfn_shinfo;
 +    unsigned long prev_gpfn_shinfo;

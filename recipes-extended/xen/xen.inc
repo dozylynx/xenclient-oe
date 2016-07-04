@@ -74,8 +74,9 @@ SRC_URI = "${XEN_SRC_URI};name=source \
     file://xc-xt-aperture-map.patch;patch=1 \
     file://xc-xt-xen-translate.patch;patch=1 \
     file://xc-xt-local-pxe-rom.patch;patch=1 \
-    file://xc-xt-v4v.patch;patch=1 \
-    file://xc-xt-v4v-viptables.patch;patch=1 \
+    file://openxt-expose-evtchn_alloc_unbound_domain.patch;patch=1 \
+    file://openxt-v4v.patch;patch=1 \
+    file://openxt-v4v-xsm.patch;patch=1 \
     file://xc-xt-unmap-shared-info.patch;patch=1 \
     file://xc-xt-foreign-batch-cacheattr.patch;patch=1 \
     file://xc-xt-allow-pat-cacheattrs-for-all-domains.patch;patch=1 \
