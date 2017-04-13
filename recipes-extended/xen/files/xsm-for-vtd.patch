@@ -1,0 +1,192 @@
+################################################################################
+SHORT DESCRIPTION:
+################################################################################
+Enable separate XSM control over device passthrough for with and without IOMMU.
+
+################################################################################
+LONG DESCRIPTION:
+################################################################################
+
+################################################################################
+CHANGELOG
+################################################################################
+
+################################################################################
+REMOVAL
+################################################################################
+Via upstreaming.
+
+################################################################################
+UPSTREAM PLAN
+################################################################################
+Yes.
+
+################################################################################
+INTERNAL DEPENDENCIES
+################################################################################
+OpenXT's XSM policy in xsm-policy.git
+
+################################################################################
+PATCHES
+################################################################################
+diff --git xen-4.6.4.orig/xen/xsm/flask/hooks.c xen-4.6.4/xen/xsm/flask/hooks.c
+index 59905e2..ffbf318 100644
+--- xen-4.6.4.orig/xen/xsm/flask/hooks.c
++++ xen-4.6.4/xen/xsm/flask/hooks.c
+@@ -20,6 +20,7 @@
+ #include <xen/errno.h>
+ #include <xen/guest_access.h>
+ #include <xen/xenoprof.h>
++#include <xen/iommu.h>
+ #ifdef HAS_PCI
+ #include <asm/msi.h>
+ #endif
+@@ -871,6 +872,7 @@ static int flask_map_domain_irq (struct domain *d, int irq, void *data)
+     u32 sid, dsid;
+     int rc = -EPERM;
+     struct avc_audit_data ad;
++    u32 dperm = RESOURCE__USE;
+ 
+     if ( irq >= nr_static_irqs && data ) {
+         rc = flask_map_domain_msi(d, irq, data, &sid, &ad);
+@@ -887,7 +889,10 @@ static int flask_map_domain_irq (struct domain *d, int irq, void *data)
+     if ( rc )
+         return rc;
+ 
+-    rc = avc_has_perm(dsid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
++    if (iommu_enabled)
++        dperm = RESOURCE__USE_WITH_IOMMU;
++
++    rc = avc_has_perm(dsid, sid, SECCLASS_RESOURCE, dperm, &ad);
+     return rc;
+ }
+ 
+@@ -936,6 +941,7 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
+     int rc = -EPERM;
+     int irq;
+     struct avc_audit_data ad;
++    u32 dperm = RESOURCE__USE;
+ 
+     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
+     if ( rc )
+@@ -951,8 +957,11 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
+     if ( rc )
+         return rc;
+ 
++    if (iommu_enabled)
++        dperm = RESOURCE__USE_WITH_IOMMU;
++
+     dsid = domain_sid(d);
+-    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
++    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, dperm, &ad);
+ }
+ 
+ static int flask_unbind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *bind)
+@@ -977,6 +986,7 @@ static int _iomem_has_perm(void *v, u32 sid, unsigned long start, unsigned long
+     struct iomem_has_perm_data *data = v;
+     struct avc_audit_data ad;
+     int rc = -EPERM;
++    u32 dperm = RESOURCE__USE;
+ 
+     AVC_AUDIT_DATA_INIT(&ad, RANGE);
+     ad.range.start = start;
+@@ -987,7 +997,10 @@ static int _iomem_has_perm(void *v, u32 sid, unsigned long start, unsigned long
+     if ( rc )
+         return rc;
+ 
+-    return avc_has_perm(data->dsid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
++    if (iommu_enabled)
++        dperm = RESOURCE__USE_WITH_IOMMU;
++
++    return avc_has_perm(data->dsid, sid, SECCLASS_RESOURCE, dperm, &ad);
+ }
+ 
+ static int flask_iomem_permission(struct domain *d, uint64_t start, uint64_t end, uint8_t access)
+@@ -1030,6 +1043,8 @@ static int flask_pci_config_permission(struct domain *d, uint32_t machine_bdf, u
+     /* Writes to the BARs count as setup */
+     if ( access && (end >= 0x10 && start < 0x28) )
+         perm = RESOURCE__SETUP;
++    else if (iommu_enabled)
++        perm = RESOURCE__USE_WITH_IOMMU;
+ 
+     AVC_AUDIT_DATA_INIT(&ad, DEV);
+     ad.device = (unsigned long) machine_bdf;
+@@ -1243,6 +1258,7 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
+     u32 dsid, rsid;
+     int rc = -EPERM;
+     struct avc_audit_data ad;
++    u32 dperm = RESOURCE__USE;
+ 
+     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
+     if ( rc )
+@@ -1258,8 +1274,11 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
+     if ( rc )
+         return rc;
+ 
++    if (iommu_enabled)
++        dperm = RESOURCE__USE_WITH_IOMMU;
++
+     dsid = domain_sid(d);
+-    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
++    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, dperm, &ad);
+ }
+ 
+ static int flask_deassign_device(struct domain *d, uint32_t machine_bdf)
+@@ -1298,6 +1317,7 @@ static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
+     u32 dsid, rsid;
+     int rc = -EPERM;
+     struct avc_audit_data ad;
++    u32 dperm = RESOURCE__USE;
+ 
+     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
+     if ( rc )
+@@ -1313,8 +1333,11 @@ static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
+     if ( rc )
+         return rc;
+ 
++    if (iommu_enabled)
++        dperm = RESOURCE__USE_WITH_IOMMU;
++
+     dsid = domain_sid(d);
+-    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
++    return avc_has_perm(dsid, rsid, SECCLASS_RESOURCE, dperm, &ad);
+ }
+ 
+ static int flask_deassign_dtdevice(struct domain *d, const char *dtpath)
+@@ -1380,6 +1403,7 @@ static int _ioport_has_perm(void *v, u32 sid, unsigned long start, unsigned long
+     struct ioport_has_perm_data *data = v;
+     struct avc_audit_data ad;
+     int rc;
++    u32 perm = RESOURCE__USE;
+ 
+     AVC_AUDIT_DATA_INIT(&ad, RANGE);
+     ad.range.start = start;
+@@ -1390,7 +1414,10 @@ static int _ioport_has_perm(void *v, u32 sid, unsigned long start, unsigned long
+     if ( rc )
+         return rc;
+ 
+-    return avc_has_perm(data->dsid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
++    if (iommu_enabled)
++        perm = RESOURCE__USE_WITH_IOMMU;
++
++    return avc_has_perm(data->dsid, sid, SECCLASS_RESOURCE, perm, &ad);
+ }
+ 
+ static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t end, uint8_t access)
+diff --git a/xsm/flask/policy/access_vectors b/xsm/flask/policy/access_vectors
+index b06cf16..639c9de 100644
+--- xen-4.6.4.orig/xen/xsm/flask/policy/access_vectors
++++ xen-4.6.4/xen/xsm/flask/policy/access_vectors
+@@ -430,6 +430,12 @@ class resource
+ #  target = resource's security label
+ # also checked when using some core Xen devices (target xen_t)
+     use
++# A distinct permission when an IOMMU is active.
++# checked when adding a resource to a domain:
++#  source = domain which will have access to the resource
++#  target = resource's security label
++# also checked when using some core Xen devices (target xen_t)
++    use_with_iommu
+ # PHYSDEVOP_map_pirq and ioapic writes for dom0, when acting on real IRQs
+ #  For GSI interrupts, the IRQ's label is indexed by the IRQ number
+ #  For MSI interrupts, the label of the PCI device is used
