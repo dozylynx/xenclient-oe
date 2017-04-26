@@ -70,6 +70,49 @@ do_configure() {
     echo "debug := n" > .config
     echo "XSM_ENABLE := y" >> .config
     echo "FLASK_ENABLE := y" >> .config
+
+    # Enabling an IOMMU parameter locks it to its more secure setting at
+    # build time, forcing the host to panic if it cannot be attained.
+    # Fixing the values at build time enables code elimination of unwanted
+    # logic from the hypervisor, increasing the work an adversary has to
+    # perform to silently disable VT-d on a running system.
+
+    if [ "${REQUIRE_IOMMU}" == "1" ] ; then
+
+        # Basic values:
+        echo "IOMMU_ALWAYS_ENABLED := y" >> .config
+        echo "IOMMU_NEVER_PASSTHROUGH := y" >> .config
+        echo "IOMMU_NEVER_DEBUG := y" >> .config
+        echo "IOMMU_NEVER_WORKAROUND_BIOS_BUG := y" >> .config
+
+        if [ "${ALLOW_INSECURE_IOMMU}" != "1" ] ; then
+
+            # Interrupt remapping is an important security setting:
+            # https://xenbits.xen.org/xsa/advisory-59.html
+            # https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2011-1898
+            # http://invisiblethingslab.com/resources/2011/Software%20Attacks%20on%20Intel%20VT-d.pdf
+
+            # Queued invalidation is a requirement for interrupt remapping.
+            echo "IOMMU_ALWAYS_QINVAL := y" >> .config
+            echo "IOMMU_ALWAYS_INTREMAP := y" >> .config
+
+            # The Force IOMMU flag has effects beyond just the one-off boot-time
+            # check for IOMMU being enabled: it changes the logic for determining
+            # which remapping engines are enabled.
+            echo "IOMMU_ALWAYS_FORCE_IOMMU := y" >> .config
+        fi
+
+        # Other available IOMMU parameters beyond the above:
+
+        # Snoop control does not appear to be available on the OptiPlex 9020 or 980.
+        # echo "IOMMU_ALWAYS_SNOOP := y" >> .config
+
+        # Setting 'dom0 strict' forces the IOMMU DMA remapping engines to be active
+        # even for devices assigned to dom0. Further testing is required to
+        # determine the practical effect on graphics and storage devices before
+        # forcing this on.
+        # echo "IOMMU_ALWAYS_DOM0_STRICT := y" >> .config
+    fi
 }
 
 do_compile() {

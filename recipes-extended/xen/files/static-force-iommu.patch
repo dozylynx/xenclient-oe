@@ -1,0 +1,417 @@
+diff --git a/Config.mk b/Config.mk
+index 8967da2..94971b6 100644
+--- a/Config.mk
++++ b/Config.mk
+@@ -216,6 +216,18 @@ EMBEDDED_EXTRA_CFLAGS += -fno-exceptions
+ XSM_ENABLE ?= n
+ FLASK_ENABLE ?= $(XSM_ENABLE)
+ 
++# Options for build-time assigment of IOMMU requirements.
++# Unassigned settings are run-time configurable.
++IOMMU_ALWAYS_ENABLED ?= n
++IOMMU_ALWAYS_FORCE_IOMMU ?= n
++IOMMU_ALWAYS_DOM0_STRICT ?= n
++IOMMU_ALWAYS_SNOOP ?= n
++IOMMU_ALWAYS_QINVAL ?= n
++IOMMU_ALWAYS_INTREMAP ?= n
++IOMMU_NEVER_PASSTHROUGH ?= n
++IOMMU_NEVER_WORKAROUND_BIOS_BUG ?= n
++IOMMU_NEVER_DEBUG ?= n
++
+ XEN_EXTFILES_URL ?= http://xenbits.xen.org/xen-extfiles
+ # All the files at that location were downloaded from elsewhere on
+ # the internet.  The original download URL is preserved as a comment
+diff --git a/xen/Rules.mk b/xen/Rules.mk
+index feb08d6..0b2194b 100644
+--- a/xen/Rules.mk
++++ b/xen/Rules.mk
+@@ -48,6 +48,17 @@ CFLAGS += -nostdinc
+ 
+ CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE
+ CFLAGS-$(FLASK_ENABLE)  += -DFLASK_ENABLE
++
++CFLAGS-$(IOMMU_ALWAYS_ENABLED)     += -DIOMMU_ALWAYS_ENABLED
++CFLAGS-$(IOMMU_ALWAYS_FORCE_IOMMU) += -DIOMMU_ALWAYS_FORCE_IOMMU
++CFLAGS-$(IOMMU_ALWAYS_DOM0_STRICT) += -DIOMMU_ALWAYS_DOM0_STRICT
++CFLAGS-$(IOMMU_ALWAYS_SNOOP)       += -DIOMMU_ALWAYS_SNOOP
++CFLAGS-$(IOMMU_ALWAYS_QINVAL)      += -DIOMMU_ALWAYS_QINVAL
++CFLAGS-$(IOMMU_ALWAYS_INTREMAP)    += -DIOMMU_ALWAYS_INTREMAP
++CFLAGS-$(IOMMU_NEVER_PASSTHROUGH)  += -DIOMMU_NEVER_PASSTHROUGH
++CFLAGS-$(IOMMU_NEVER_WORKAROUND_BIOS_BUG) += -DIOMMU_NEVER_WORKAROUND_BIOS_BUG
++CFLAGS-$(IOMMU_NEVER_DEBUG)        += -DIOMMU_NEVER_DEBUG
++
+ CFLAGS-$(verbose)       += -DVERBOSE
+ CFLAGS-$(crash_debug)   += -DCRASH_DEBUG
+ CFLAGS-$(perfc)         += -DPERF_COUNTERS
+diff --git a/xen/arch/x86/apic.c b/xen/arch/x86/apic.c
+index 44b1ac9..b6f9932 100644
+--- a/xen/arch/x86/apic.c
++++ b/xen/arch/x86/apic.c
+@@ -964,7 +964,7 @@ void __init x2apic_bsp_setup(void)
+         goto restore_out;
+     }
+ 
+-    force_iommu = 1;
++    set_force_iommu(1);
+ 
+     genapic = apic_x2apic_probe();
+     printk("Switched to APIC driver %s.\n", genapic->name);
+diff --git a/xen/drivers/passthrough/amd/iommu_init.c b/xen/drivers/passthrough/amd/iommu_init.c
+index d90a2d2..556319c 100644
+--- a/xen/drivers/passthrough/amd/iommu_init.c
++++ b/xen/drivers/passthrough/amd/iommu_init.c
+@@ -1062,9 +1062,9 @@ static void __init amd_iommu_init_cleanup(void)
+     /* free ivrs_mappings[] */
+     radix_tree_destroy(&ivrs_maps, xfree);
+ 
+-    iommu_enabled = 0;
+-    iommu_passthrough = 0;
+-    iommu_intremap = 0;
++    set_iommu_enabled(0);
++    set_iommu_passthrough(0);
++    set_iommu_intremap(0);
+     iommuv2_enabled = 0;
+ }
+ 
+diff --git a/xen/drivers/passthrough/amd/pci_amd_iommu.c b/xen/drivers/passthrough/amd/pci_amd_iommu.c
+index 453e979..09c4520 100644
+--- a/xen/drivers/passthrough/amd/pci_amd_iommu.c
++++ b/xen/drivers/passthrough/amd/pci_amd_iommu.c
+@@ -205,7 +205,7 @@ int __init amd_iov_detect(void)
+     if ( (amd_iommu_detect_acpi() !=0) || (iommu_found() == 0) )
+     {
+         printk("AMD-Vi: IOMMU not found!\n");
+-        iommu_intremap = 0;
++        set_iommu_intremap_or_panic(0);
+         return -ENODEV;
+     }
+ 
+diff --git a/xen/drivers/passthrough/iommu.c b/xen/drivers/passthrough/iommu.c
+index 5d040b0..beb5f26 100644
+--- a/xen/drivers/passthrough/iommu.c
++++ b/xen/drivers/passthrough/iommu.c
+@@ -39,19 +39,38 @@ static void iommu_dump_p2m_table(unsigned char key);
+  *   no-intremap                Disable VT-d Interrupt Remapping
+  */
+ custom_param("iommu", parse_iommu_param);
++
++#ifndef IOMMU_ALWAYS_ENABLED
+ bool_t __initdata iommu_enable = 1;
+ bool_t __read_mostly iommu_enabled;
++#endif
++#ifndef IOMMU_ALWAYS_FORCE_IOMMU
+ bool_t __read_mostly force_iommu;
++#endif
++#ifndef IOMMU_ALWAYS_DOM0_STRICT
+ bool_t __hwdom_initdata iommu_dom0_strict;
+-bool_t __read_mostly iommu_verbose;
++#endif
++#ifndef IOMMU_NEVER_WORKAROUND_BIOS_BUG
+ bool_t __read_mostly iommu_workaround_bios_bug;
+-bool_t __read_mostly iommu_igfx = 1;
++#endif
++#ifndef IOMMU_NEVER_PASSTHROUGH
+ bool_t __read_mostly iommu_passthrough;
++#endif
++#ifndef IOMMU_ALWAYS_SNOOP
+ bool_t __read_mostly iommu_snoop = 1;
++#endif
++#ifndef IOMMU_ALWAYS_QINVAL
+ bool_t __read_mostly iommu_qinval = 1;
++#endif
++#ifndef IOMMU_ALWAYS_INTREMAP
+ bool_t __read_mostly iommu_intremap = 1;
+-bool_t __read_mostly iommu_hap_pt_share = 1;
++#endif
++#ifndef IOMMU_NEVER_DEBUG
+ bool_t __read_mostly iommu_debug;
++#endif
++bool_t __read_mostly iommu_verbose;
++bool_t __read_mostly iommu_igfx = 1;
++bool_t __read_mostly iommu_hap_pt_share = 1;
+ bool_t __read_mostly amd_iommu_perdev_intremap = 1;
+ 
+ DEFINE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
+@@ -81,33 +100,33 @@ static void __init parse_iommu_param(char *s)
+             *ss = '\0';
+ 
+         if ( !parse_bool(s) )
+-            iommu_enable = 0;
++            set_iommu_enable_or_panic(0);
+         else if ( !strcmp(s, "force") || !strcmp(s, "required") )
+-            force_iommu = val;
++            set_force_iommu_or_panic(val);
+         else if ( !strcmp(s, "workaround_bios_bug") )
+-            iommu_workaround_bios_bug = val;
++            set_iommu_workaround_bios_bug_or_panic(val);
+         else if ( !strcmp(s, "igfx") )
+             iommu_igfx = val;
+         else if ( !strcmp(s, "verbose") )
+             iommu_verbose = val;
+         else if ( !strcmp(s, "snoop") )
+-            iommu_snoop = val;
++            set_iommu_snoop_or_panic(val);
+         else if ( !strcmp(s, "qinval") )
+-            iommu_qinval = val;
++            set_iommu_qinval_or_panic(val);
+         else if ( !strcmp(s, "intremap") )
+-            iommu_intremap = val;
++            set_iommu_intremap_or_panic(val);
+         else if ( !strcmp(s, "debug") )
+         {
+-            iommu_debug = val;
++            set_iommu_debug_or_panic(val);
+             if ( val )
+                 iommu_verbose = 1;
+         }
+         else if ( !strcmp(s, "amd-iommu-perdev-intremap") )
+             amd_iommu_perdev_intremap = val;
+         else if ( !strcmp(s, "dom0-passthrough") )
+-            iommu_passthrough = val;
++            set_iommu_passthrough_or_panic(val);
+         else if ( !strcmp(s, "dom0-strict") )
+-            iommu_dom0_strict = val;
++            set_iommu_dom0_strict_or_panic(val);
+         else if ( !strcmp(s, "sharept") )
+             iommu_hap_pt_share = val;
+ 
+@@ -142,7 +161,7 @@ static void __hwdom_init check_hwdom_reqs(struct domain *d)
+         panic("Dom0 uses paging translated mode, dom0-passthrough must not be "
+               "enabled\n");
+ 
+-    iommu_dom0_strict = 1;
++    set_iommu_dom0_strict_or_panic(1);
+ }
+ 
+ void __hwdom_init iommu_hwdom_init(struct domain *d)
+@@ -289,15 +308,15 @@ int __init iommu_setup(void)
+     bool_t force_intremap = force_iommu && iommu_intremap;
+ 
+     if ( iommu_dom0_strict )
+-        iommu_passthrough = 0;
++        set_iommu_passthrough_or_panic(0);
+ 
+     if ( iommu_enable )
+     {
+         rc = iommu_hardware_setup();
+-        iommu_enabled = (rc == 0);
++        set_iommu_enabled_or_panic(rc == 0);
+     }
+     if ( !iommu_enabled )
+-        iommu_intremap = 0;
++        set_iommu_intremap_or_panic(0);
+ 
+     if ( (force_iommu && !iommu_enabled) ||
+          (force_intremap && !iommu_intremap) )
+@@ -306,9 +325,9 @@ int __init iommu_setup(void)
+ 
+     if ( !iommu_enabled )
+     {
+-        iommu_snoop = 0;
+-        iommu_passthrough = 0;
+-        iommu_dom0_strict = 0;
++        set_iommu_snoop_or_panic(0);
++        set_iommu_passthrough_or_panic(0);
++        set_iommu_dom0_strict_or_panic(0);
+     }
+     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
+     if ( iommu_enabled )
+@@ -371,7 +390,8 @@ void iommu_crash_shutdown(void)
+     const struct iommu_ops *ops = iommu_get_ops();
+     if ( iommu_enabled )
+         ops->crash_shutdown();
+-    iommu_enabled = iommu_intremap = 0;
++    set_iommu_enabled_or_panic(0);
++    set_iommu_intremap_or_panic(0);
+ }
+ 
+ int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
+diff --git a/xen/drivers/passthrough/vtd/iommu.c b/xen/drivers/passthrough/vtd/iommu.c
+index 8165900..a380751 100644
+--- a/xen/drivers/passthrough/vtd/iommu.c
++++ b/xen/drivers/passthrough/vtd/iommu.c
+@@ -2083,7 +2083,7 @@ static int init_vtd_hw(void)
+         {
+             if ( ioapic_to_iommu(IO_APIC_ID(apic)) == NULL )
+             {
+-                iommu_intremap = 0;
++                set_iommu_intremap_or_panic(0);
+                 dprintk(XENLOG_ERR VTDPREFIX,
+                     "ioapic_to_iommu: ioapic %#x (id: %#x) is NULL! "
+                     "Will not try to enable Interrupt Remapping.\n",
+@@ -2099,7 +2099,7 @@ static int init_vtd_hw(void)
+             iommu = drhd->iommu;
+             if ( enable_intremap(iommu, 0) != 0 )
+             {
+-                iommu_intremap = 0;
++                set_iommu_intremap_or_panic(0);
+                 dprintk(XENLOG_WARNING VTDPREFIX,
+                         "Interrupt Remapping not enabled\n");
+ 
+@@ -2197,16 +2197,16 @@ int __init intel_vtd_setup(void)
+         printk(".\n");
+ 
+         if ( iommu_snoop && !ecap_snp_ctl(iommu->ecap) )
+-            iommu_snoop = 0;
++            set_iommu_snoop_or_panic(0);
+ 
+         if ( iommu_passthrough && !ecap_pass_thru(iommu->ecap) )
+-            iommu_passthrough = 0;
++            set_iommu_passthrough_or_panic(0);
+ 
+         if ( iommu_qinval && !ecap_queued_inval(iommu->ecap) )
+-            iommu_qinval = 0;
++            set_iommu_qinval_or_panic(0);
+ 
+         if ( iommu_intremap && !ecap_intr_remap(iommu->ecap) )
+-            iommu_intremap = 0;
++            set_iommu_intremap_or_panic(0);
+ 
+         if ( !vtd_ept_page_compatible(iommu) )
+             iommu_hap_pt_share = 0;
+@@ -2223,7 +2223,7 @@ int __init intel_vtd_setup(void)
+ 
+     if ( !iommu_qinval && iommu_intremap )
+     {
+-        iommu_intremap = 0;
++        set_iommu_intremap_or_panic(0);
+         dprintk(XENLOG_WARNING VTDPREFIX, "Interrupt Remapping disabled "
+             "since Queued Invalidation isn't supported or enabled.\n");
+     }
+@@ -2247,11 +2247,11 @@ int __init intel_vtd_setup(void)
+     return 0;
+ 
+  error:
+-    iommu_enabled = 0;
+-    iommu_snoop = 0;
+-    iommu_passthrough = 0;
+-    iommu_qinval = 0;
+-    iommu_intremap = 0;
++    set_iommu_enabled_or_panic(0);
++    set_iommu_snoop_or_panic(0);
++    set_iommu_passthrough_or_panic(0);
++    set_iommu_qinval_or_panic(0);
++    set_iommu_intremap_or_panic(0);
+     return ret;
+ }
+ 
+diff --git a/xen/drivers/passthrough/vtd/quirks.c b/xen/drivers/passthrough/vtd/quirks.c
+index b1859c2..b4c7742 100644
+--- a/xen/drivers/passthrough/vtd/quirks.c
++++ b/xen/drivers/passthrough/vtd/quirks.c
+@@ -312,7 +312,7 @@ static void __init tylersburg_intremap_quirk(void)
+         {
+             printk(XENLOG_WARNING VTDPREFIX
+                    "Disabling IOMMU due to Intel 5500/5520/X58 Chipset errata #47, #53\n");
+-            iommu_enable = 0;
++            set_iommu_enable_or_panic(0);
+             break;
+         }
+     }
+diff --git a/xen/include/xen/iommu.h b/xen/include/xen/iommu.h
+index 28c9f88..d4c32ca 100644
+--- a/xen/include/xen/iommu.h
++++ b/xen/include/xen/iommu.h
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (c) 2006, Intel Corporation.
++ * Copyright (c) 2017, BAE Systems.
+  *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms and conditions of the GNU General Public License,
+@@ -27,12 +28,90 @@
+ #include <asm/device.h>
+ #include <asm/iommu.h>
+ 
+-extern bool_t iommu_enable, iommu_enabled;
+-extern bool_t force_iommu, iommu_verbose;
+-extern bool_t iommu_workaround_bios_bug, iommu_igfx, iommu_passthrough;
+-extern bool_t iommu_snoop, iommu_qinval, iommu_intremap;
++#define RUNTIME_IOMMU_PARAM(PARAM_NAME) \
++extern bool_t PARAM_NAME; \
++static inline void set_ ## PARAM_NAME (bool_t v) { PARAM_NAME = v; } \
++static inline void set_ ## PARAM_NAME ## _or_panic (bool_t v) { PARAM_NAME = v; }
++
++#define BUILDTIME_IOMMU_PARAM(PARAM_NAME, PARAM_VALUE) \
++static inline void set_ ## PARAM_NAME (bool_t v) { /* ignored */ } \
++static inline void set_ ## PARAM_NAME ##_or_panic(bool_t v) \
++    { if (v != PARAM_VALUE) panic("I/O Virtualization configuration error.\n" \
++                                  "IOMMU " #PARAM_NAME " configuration failed.\n"); }
++
++/* Boolean parameters identified here can optionally be set to fixed values
++ * during build configuration, enabling code elimination by the compiler.
++ */
++
++#ifdef IOMMU_ALWAYS_ENABLED
++#define iommu_enable IOMMU_ALWAYS_ENABLED
++#define iommu_enabled IOMMU_ALWAYS_ENABLED
++BUILDTIME_IOMMU_PARAM(iommu_enable, 1)
++BUILDTIME_IOMMU_PARAM(iommu_enabled, 1)
++#else
++RUNTIME_IOMMU_PARAM(iommu_enable)
++RUNTIME_IOMMU_PARAM(iommu_enabled)
++#endif
++
++#ifdef IOMMU_ALWAYS_FORCE_IOMMU
++BUILDTIME_IOMMU_PARAM(force_iommu, 1)
++#define force_iommu 1
++#else
++RUNTIME_IOMMU_PARAM(force_iommu)
++#endif
++
++#ifdef IOMMU_ALWAYS_DOM0_STRICT
++BUILDTIME_IOMMU_PARAM(iommu_dom0_strict, 1)
++#define iommu_dom0_strict 1
++#else
++RUNTIME_IOMMU_PARAM(iommu_dom0_strict)
++#endif
++
++#ifdef IOMMU_NEVER_WORKAROUND_BIOS_BUG
++BUILDTIME_IOMMU_PARAM(iommu_workaround_bios_bug, 0)
++#define iommu_workaround_bios_bug 0
++#else
++RUNTIME_IOMMU_PARAM(iommu_workaround_bios_bug)
++#endif
++
++#ifdef IOMMU_NEVER_PASSTHROUGH
++BUILDTIME_IOMMU_PARAM(iommu_passthrough, 0)
++#define iommu_passthrough 0
++#else
++RUNTIME_IOMMU_PARAM(iommu_passthrough)
++#endif
++
++#ifdef IOMMU_ALWAYS_SNOOP
++BUILDTIME_IOMMU_PARAM(iommu_snoop, 1)
++#define iommu_snoop 1
++#else
++RUNTIME_IOMMU_PARAM(iommu_snoop)
++#endif
++
++#ifdef IOMMU_ALWAYS_QINVAL
++BUILDTIME_IOMMU_PARAM(iommu_qinval, 1)
++#define iommu_qinval 1
++#else
++RUNTIME_IOMMU_PARAM(iommu_qinval)
++#endif
++
++#ifdef IOMMU_ALWAYS_INTREMAP
++BUILDTIME_IOMMU_PARAM(iommu_intremap, 1)
++#define iommu_intremap 1
++#else
++RUNTIME_IOMMU_PARAM(iommu_intremap)
++#endif
++
++#ifdef IOMMU_NEVER_DEBUG
++BUILDTIME_IOMMU_PARAM(iommu_debug, 0)
++#define iommu_debug 0
++#else
++RUNTIME_IOMMU_PARAM(iommu_debug)
++#endif
++
++extern bool_t iommu_verbose;
++extern bool_t iommu_igfx;
+ extern bool_t iommu_hap_pt_share;
+-extern bool_t iommu_debug;
+ extern bool_t amd_iommu_perdev_intremap;
+ 
+ #define IOMMU_PAGE_SIZE(sz) (1UL << PAGE_SHIFT_##sz)
