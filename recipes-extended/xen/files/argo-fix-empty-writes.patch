@@ -1,0 +1,47 @@
+################################################################################
+SHORT DESCRIPTION:
+################################################################################
+Don't write header into the destination ring when the message is empty.
+
+################################################################################
+LONG DESCRIPTION:
+################################################################################
+
+################################################################################
+CHANGELOG
+################################################################################
+Original: Christopher Clark, christopher.w.clark@gmail.com
+
+################################################################################
+REMOVAL
+################################################################################
+Once upstream.
+
+################################################################################
+UPSTREAM PLAN
+################################################################################
+Yes.
+
+################################################################################
+INTERNAL DEPENDENCIES
+################################################################################
+None
+
+################################################################################
+PATCHES
+################################################################################
+diff --git a/xen/common/argo.c b/xen/common/argo.c
+--- a/xen/common/argo.c
++++ b/xen/common/argo.c
+@@ -2037,9 +2037,10 @@ sendv(struct domain *src_d, xen_argo_addr_t *src_addr,
+         /*
+          * Obtain the total size of data to transmit -- sets the 'len' variable
+          * -- and sanity check that the iovs conform to size and number limits.
++         * If len is zero, no need for anything to be written into the ring.
+          */
+         ret = iov_count(iovs, niov, &len);
+-        if ( !ret )
++        if ( !ret && len )
+         {
+             ret = ringbuf_insert(dst_d, ring_info, &src_id, iovs, niov,
+                                  message_type, len);
