@@ -9,7 +9,10 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=4641e94ec96f98fabc56ff9cc48be14b"
 
 PV = "git${SRCPV}"
 
-SRC_URI = "git://${OPENXT_GIT_MIRROR}/linux-xen-argo.git;protocol=${OPENXT_GIT_PROTOCOL};branch=${OPENXT_BRANCH}"
+SRC_URI = " \
+    git://${OPENXT_GIT_MIRROR}/linux-xen-argo.git;protocol=${OPENXT_GIT_PROTOCOL};branch=${OPENXT_BRANCH} \
+    file://argo-module-DRAFT-OXT-1699-readspace.patch \
+    "
 SRCREV = "${AUTOREV}"
 
 S = "${WORKDIR}/git/argo-linux"

@@ -6,7 +6,10 @@ DEPENDS = "xen argo-module-headers"
 PV = "git${SRCPV}"
 
 SRCREV = "${AUTOREV}"
-SRC_URI = "git://${OPENXT_GIT_MIRROR}/linux-xen-argo.git;protocol=${OPENXT_GIT_PROTOCOL};branch=${OPENXT_BRANCH}"
+SRC_URI = " \
+    git://${OPENXT_GIT_MIRROR}/linux-xen-argo.git;protocol=${OPENXT_GIT_PROTOCOL};branch=${OPENXT_BRANCH} \
+    file://libargo-DRAFT-OXT-1699-readspace.patch \
+    "
 
 S = "${WORKDIR}/git/libargo"
 
