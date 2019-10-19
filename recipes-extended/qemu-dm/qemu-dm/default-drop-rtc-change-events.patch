@@ -1,0 +1,13 @@
+diff --git a/monitor.c b/monitor.c
+index ca397d0..365e4e0 100644
+--- a/monitor.c
++++ b/monitor.c
+@@ -504,7 +504,7 @@ static void qmp_send_response(Monitor *mon, const QDict *rsp)
+ 
+ static MonitorQAPIEventConf monitor_qapi_event_conf[QAPI_EVENT__MAX] = {
+     /* Limit guest-triggerable events to 1 per second */
+-    [QAPI_EVENT_RTC_CHANGE]        = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
++    [QAPI_EVENT_RTC_CHANGE]        = { 1000 * SCALE_MS, MONITOR_EVENT_DROP },
+     [QAPI_EVENT_WATCHDOG]          = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
+     [QAPI_EVENT_BALLOON_CHANGE]    = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
+     [QAPI_EVENT_QUORUM_REPORT_BAD] = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
