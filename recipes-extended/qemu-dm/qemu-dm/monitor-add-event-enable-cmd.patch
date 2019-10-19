@@ -1,0 +1,98 @@
+diff --git a/hmp-commands.hx b/hmp-commands.hx
+index db0c681..84c2430 100644
+--- a/hmp-commands.hx
++++ b/hmp-commands.hx
+@@ -1888,6 +1888,20 @@ Set QOM property @var{property} of object at location @var{path} to value @var{v
+ ETEXI
+ 
+     {
++        .name       = "event-enable",
++        .args_type  = "event:s,enable:b",
++        .params     = "event enable",
++        .help       = "enable or disable delivery of a QMP event type",
++        .cmd        = hmp_event_enable,
++    },
++
++STEXI
++@item event-enable @var{event} @var{rate}
++@findex event-enable
++Enable or disable delivery of QMP event types
++ETEXI
++
++    {
+         .name       = "info",
+         .args_type  = "item:s?",
+         .params     = "[subcommand]",
+diff --git a/monitor.c b/monitor.c
+index d39390c..ca397d0 100644
+--- a/monitor.c
++++ b/monitor.c
+@@ -199,7 +199,10 @@ typedef struct MonitorQAPIEventState {
+ 
+ typedef struct {
+     int64_t rate;       /* Minimum time (in ns) between two events */
++    bool drop;          /* Skip sending this event type */
+ } MonitorQAPIEventConf;
++#define MONITOR_EVENT_DROP true
++#define MONITOR_EVENT_SEND false
+ 
+ struct Monitor {
+     CharBackend chr;
+@@ -501,12 +504,12 @@ static void qmp_send_response(Monitor *mon, const QDict *rsp)
+ 
+ static MonitorQAPIEventConf monitor_qapi_event_conf[QAPI_EVENT__MAX] = {
+     /* Limit guest-triggerable events to 1 per second */
+-    [QAPI_EVENT_RTC_CHANGE]        = { 1000 * SCALE_MS },
+-    [QAPI_EVENT_WATCHDOG]          = { 1000 * SCALE_MS },
+-    [QAPI_EVENT_BALLOON_CHANGE]    = { 1000 * SCALE_MS },
+-    [QAPI_EVENT_QUORUM_REPORT_BAD] = { 1000 * SCALE_MS },
+-    [QAPI_EVENT_QUORUM_FAILURE]    = { 1000 * SCALE_MS },
+-    [QAPI_EVENT_VSERPORT_CHANGE]   = { 1000 * SCALE_MS },
++    [QAPI_EVENT_RTC_CHANGE]        = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
++    [QAPI_EVENT_WATCHDOG]          = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
++    [QAPI_EVENT_BALLOON_CHANGE]    = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
++    [QAPI_EVENT_QUORUM_REPORT_BAD] = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
++    [QAPI_EVENT_QUORUM_FAILURE]    = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
++    [QAPI_EVENT_VSERPORT_CHANGE]   = { 1000 * SCALE_MS, MONITOR_EVENT_SEND },
+ };
+ 
+ /*
+@@ -545,7 +548,10 @@ monitor_qapi_event_queue_no_reenter(QAPIEvent event, QDict *qdict)
+ 
+     qemu_mutex_lock(&monitor_lock);
+ 
+-    if (!evconf->rate) {
++    if (evconf->drop) {
++        /* Configured not to send this event type so do nothing */
++        ;
++    } else if (!evconf->rate) {
+         /* Unthrottled event */
+         monitor_qapi_event_emit(event, qdict);
+     } else {
+@@ -1819,6 +1825,26 @@ static void hmp_sum(Monitor *mon, const QDict *qdict)
+     monitor_printf(mon, "%05d\n", sum);
+ }
+ 
++static void hmp_event_enable(Monitor *mon, const QDict *qdict)
++{
++    const char *event_name = qdict_get_str(qdict, "event");
++    bool state = qdict_get_bool(qdict, "enable");
++    Error *local_err = NULL;
++    int event;
++
++    fprintf(stderr, "hmp_event_enable: %s : %d\n", event_name, state);
++
++    event = qapi_enum_parse(&QAPIEvent_lookup, event_name, -1, &local_err);
++    if ((event >= 0) && (event < QAPI_EVENT__MAX)) {
++        fprintf(stderr, "hmp_event_enable: setting %d to %d\n", event, !state);
++        monitor_qapi_event_conf[event].drop = !state;
++    }
++
++    if (local_err) {
++        error_report_err(local_err);
++    }
++}
++
+ static int mouse_button_state;
+ 
+ static void hmp_mouse_move(Monitor *mon, const QDict *qdict)
