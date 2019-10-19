@@ -1,0 +1,21 @@
+diff --git a/monitor.c b/monitor.c
+index 365e4e0..58f96d5 100644
+--- a/monitor.c
++++ b/monitor.c
+@@ -543,6 +543,7 @@ monitor_qapi_event_queue_no_reenter(QAPIEvent event, QDict *qdict)
+     MonitorQAPIEventState *evstate;
+ 
+     assert(event < QAPI_EVENT__MAX);
++    fprintf(stderr, "QAPI_EVENT: %u\n", event);
+     evconf = &monitor_qapi_event_conf[event];
+     trace_monitor_protocol_event_queue(event, qdict, evconf->rate);
+ 
+@@ -550,7 +551,7 @@ monitor_qapi_event_queue_no_reenter(QAPIEvent event, QDict *qdict)
+ 
+     if (evconf->drop) {
+         /* Configured not to send this event type so do nothing */
+-        ;
++        fprintf(stderr, "Dropping QAPI_EVENT: %d\n", event);
+     } else if (!evconf->rate) {
+         /* Unthrottled event */
+         monitor_qapi_event_emit(event, qdict);

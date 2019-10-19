@@ -53,6 +53,7 @@ SRC_URI += "file://compile-time-stubdom-flag.patch \
             file://round-pci-region-sizes.patch \
             file://monitor-add-event-enable-cmd.patch \
             file://default-drop-rtc-change-events.patch \
+            file://instrument-event-handler.patch \
             "
 
 SRC_URI[md5sum] = "8a75cfd18460143d1b352234e437ca8d"
