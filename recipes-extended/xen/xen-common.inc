@@ -107,6 +107,7 @@ COMPATIBLE_HOST = 'i686-oe-linux|(x86_64.*).*-linux|aarch64.*-linux'
 
 PACKAGECONFIG =+ "xsm"
 PACKAGECONFIG =+ "hvm"
+PACKAGECONFIG =+ "externalblktap"
 
 S = "${WORKDIR}/git"
 
@@ -126,9 +127,11 @@ deltask stubs
 deltask deploy
 
 do_configure_append() {
-    if [ ! -e ${STAGING_INCDIR}/bits/long-double-32.h ]; then
-        cp ${STAGING_INCDIR}/bits/long-double-64.h ${STAGING_INCDIR}/bits/long-double-32.h
-        cp ${STAGING_INCDIR}/gnu/stubs-64.h ${STAGING_INCDIR}/gnu/stubs-32.h
+    if [ ! -e "${STAGING_INCDIR}/bits/long-double-32.h" ]; then
+        cp "${STAGING_INCDIR}/bits/long-double-64.h" "${STAGING_INCDIR}/bits/long-double-32.h"
+    fi
+    if [ ! -e "${STAGING_INCDIR}/gnu/stubs-32.h" ]; then
+        cp "${STAGING_INCDIR}/gnu/stubs-64.h" "${STAGING_INCDIR}/gnu/stubs-32.h"
     fi
 }
 #--
