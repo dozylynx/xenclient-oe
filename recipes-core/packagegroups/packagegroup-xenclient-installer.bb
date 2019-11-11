@@ -64,15 +64,15 @@ RDEPENDS_${PN} = " \
     xenclient-pcrdiff \
     xenclient-tpm-scripts \
     xenclient-udev-force-discreet-net-to-eth0 \
-    xen-console \
+    xen-tools-console \
     xen-efi \
-    xen-flask-tools \
-    xen-hypervisor \
-    xen-libxenguest \
-    xen-libxenlight \
-    xen-libxenstat \
-    xen-libxlutil \
-    xen-xenstat \
-    xen-xl \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'blktap2', 'xen-blktap xen-libblktapctl xen-libvhd', 'blktap3', d)} \
+    xen-tools-flask-tools \
+    xen \
+    xen-tools-libxenguest \
+    xen-libxl-libxenlight \
+    xen-tools-libxenstat \
+    xen-libxl-libxlutil \
+    xen-tools-xenstat \
+    xen-libxl-xl \
+    ${@bb.utils.contains('DISTRO_FEATURES', 'blktap2', 'xen-blktap-blktap xen-blktap-libblktapctl xen-blktap-libvhd', 'blktap3', d)} \
 "

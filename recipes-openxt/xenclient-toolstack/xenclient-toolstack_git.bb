@@ -2,7 +2,7 @@ DESCRIPTION = "XenClient toolstack"
 LICENSE = "LGPLv2.1"
 LIC_FILES_CHKSUM = "file://COPYING;md5=321bf41f280cf805086dd5a720b37785"
 DEPENDS += "ocaml-dbus camomile xen xz"
-RDEPENDS_${PN} = "xen-xenstore xen-xenstored"
+RDEPENDS_${PN} = "xen-tools-xenstore virtual/xenstored"
 RDEPENDS_${PN}_xenclient-ndvm += " db-tools"
 
 DEPENDS_append_xenclient-nilfvm += " ${@deb_bootstrap_deps(d)} "

@@ -19,7 +19,7 @@ RDEPENDS_${PN} += "python \
                    python-syslog \
                    pyicbinn \
                    curl \
-                   xen-xenstore"
+                   xen-tools-xenstore"
 
 PV = "0+git${SRCPV}"
 

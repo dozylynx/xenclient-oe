@@ -12,7 +12,7 @@ SRC_URI_append = " \
 
 DEPENDS += " \
     util-linux \
-    xen \
+    xen-tools \
     ${@bb.utils.contains('DISTRO_FEATURES', 'blktap2', 'xen-blktap', 'blktap3', d)} \
     libnl \
     "

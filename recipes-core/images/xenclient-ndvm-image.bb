@@ -63,8 +63,8 @@ IMAGE_INSTALL = " \
     rsyslog \
     xenclient-udev-force-discreet-net-to-eth0 \
     argo-module \
-    xen-libxenstore \
-    xen-xenstore \
+    xen-tools-libxenstore \
+    xen-tools-xenstore \
     xen-ocaml-libs \
     wget \
     ethtool \
