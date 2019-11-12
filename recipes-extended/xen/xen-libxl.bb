@@ -3,32 +3,12 @@ require xen-common.inc
 
 DESCRIPTION = "Xen hypervisor libxl components"
 
-# In OpenXT, multiple recipes are used to build Xen and its components:
-# a 32-bit build of tools ; a 64-bit hypervisor ; a separate blktap
-# build to fix potentially circular dependencies with libargo and icbinn
-# and the remainder.
-#
-# This recipe shares a common xen.inc with other recipes.
-# PN in this recipe is "xen-libxl", rather than "xen" as xen.inc is
-# written to expect, so in order to produce the expected package names
-# with a "xen-" rather than "xen-libxl-" prefix, this python section
-# renames the FILES_... variables defined in xen.inc.
-# Most package names are defined explicitly rather than using ${PN}.
+inherit setuptools update-rc.d
 
-python () {
-    for PKG in ['xl',
-                'xl-dev',
-                'libxlutil',
-                'libxlutil-dev',
-                'libxenlight',
-                'libxenlight-dev']:
-        d.renameVar("FILES_xen-libxl-" + PKG, "FILES_xen-" + PKG)
-
-    # After renaming a variable, it is simpler to append to it here:
-    d.appendVar("FILES_xen-xl", " /etc/init.d/xen-init-dom0")
-}
-
-FLASK_POLICY_FILE = "xenpolicy-${XEN_PV}"
+SRC_URI_append = " \
+    file://xen-init-dom0.initscript \
+    file://xl.conf \
+    "
 
 DEPENDS += " \
     util-linux \
@@ -37,44 +17,35 @@ DEPENDS += " \
     libnl \
     "
 
-RDEPENDS_${PN}-base_remove = " \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'blktap2', '', '${PN}-blktap ${PN}-libblktapctl ${PN}-libvhd', d)} \
-    "
+# inherit setuptools adds python to RDEPENDS, override it
+RDEPENDS_${PN} = ""
 
-RDEPENDS_xen-xl += " \
-    xen-scripts-block \
+RDEPENDS_${PN}-xl += " \
+    xen-tools-scripts-block \
 "
 
-RRECOMMENDS_${PN}-base_remove = " \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'blktap2', '', '${PN}-libblktap', d)} \
-    "
-
-SRC_URI_append = " \
-    file://xen-init-dom0.initscript \
-    file://xl.conf \
-    "
+RDEPENDS_${PN}-dev = " \
+    ${PN}-libxenlight \
+    ${PN}-libxlutil \
+"
 
 PACKAGES = " \
-    xen-xl \
-    xen-libxl-dev \
-    xen-libxlutil \
-    xen-libxlutil-dev \
-    xen-libxenlight \
-    xen-libxenlight-dev \
-    xen-libxl-staticdev \
-    xen-cmp-fd-file-inode \
+    ${PN}-xl \
+    ${PN}-dev \
+    ${PN}-libxlutil \
+    ${PN}-libxlutil-dev \
+    ${PN}-libxenlight \
+    ${PN}-libxenlight-dev \
+    ${PN}-staticdev \
     ${PN}-dbg \
-    "
-
-PACKAGES_remove = " \
-    ${@bb.utils.contains('DISTRO_FEATURES', 'blktap2', '', '${PN}-blktap ${PN}-libblktap ${PN}-libblktapctl ${PN}-libblktapctl-dev ${PN}-libblktap-dev', d)} \
+    ${PN}-cmp-fd-file-inode \
     "
 
 FILES_${PN}-staticdev = " \
     ${libdir}/libxlutil.a \
     ${libdir}/libxenlight.a \
     "
-FILES_xen-libxlutil += " \
+FILES_${PN}-libxlutil += " \
     ${sysconfdir}/xen/xl.conf \
 "
 FILES_${PN}-dev += " \
@@ -86,9 +57,32 @@ FILES_${PN}-dbg += " \
     ${libdir}/.debug \
     /usr/src/debug \
 "
-FILES_xen-cmp-fd-file-inode = " \
+FILES_${PN}-cmp-fd-file-inode = " \
     ${libdir}/xen/bin/cmp-fd-file-inode \
 "
+
+FILES_${PN}-xl = "\
+    ${sysconfdir}/bash_completion.d/xl.sh \
+    ${sysconfdir}/xen/xl.conf \
+    ${libdir}/xen/bin/libxl-save-helper \
+    ${sbindir}/xl \
+    ${libdir}/xen/bin/xen-init-dom0 \
+    ${sysconfdir}/init.d/xen-init-dom0 \
+    "
+
+FILES_${PN}-libxenlight = "${libdir}/libxenlight.so.*"
+FILES_${PN}-libxenlight-dev = " \
+    ${libdir}/libxenlight.so \
+    ${libdir}/pkgconfig/xenlight.pc \
+    ${datadir}/pkgconfig/xenlight.pc \
+    "
+
+FILES_${PN}-libxlutil = "${libdir}/libxlutil.so.*"
+FILES_${PN}-libxlutil-dev = " \
+    ${libdir}/libxlutil.so \
+    ${libdir}/pkgconfig/xlutil.pc \
+    ${datadir}/pkgconfig/xlutil.pc \
+    "
 
 CFLAGS_prepend += "${@bb.utils.contains('DISTRO_FEATURES', 'blktap2', '', '-I${STAGING_INCDIR}/blktap',d)}"
 
@@ -110,16 +104,18 @@ FULL_OPTIMIZATION = "-pipe ${DEBUG_FLAGS}"
 TARGET_CC_ARCH += "${LDFLAGS}"
 CC_FOR_OCAML="${TARGET_PREFIX}gcc"
 
-INITSCRIPT_PACKAGES = "xen-xl"
-INITSCRIPT_NAME_xen-xl = "xen-init-dom0"
-INITSCRIPT_PARAMS_xen-xl = "defaults 21"
+INITSCRIPT_PACKAGES = "${PN}-xl"
+INITSCRIPT_NAME_${PN}-xl = "xen-init-dom0"
+INITSCRIPT_PARAMS_${PN}-xl = "defaults 21"
 
-do_configure_prepend() {
+do_configure() {
 	#remove optimizations in the config files
 	sed -i 's/-O2//g' ${S}/Config.mk
 	sed -i 's/-O2//g' ${S}/config/StdGNU.mk
 
 	cp "${WORKDIR}/defconfig" "${B}/xen/.config"
+
+    do_configure_common
 }
 
 do_compile() {
