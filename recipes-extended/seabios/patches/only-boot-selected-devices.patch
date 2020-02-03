@@ -11,10 +11,14 @@ then add any detected device to a boot entry.  This can add several seconds
 to the VM boot time. This patch avoid that by not filling a boot entry for
 devices that were not present in the NVRAM boot order.
 
+Also disable the special-case CD-Rom query when QEMU is detected since the
+assumption that it will not access a physical device is inaccurate for OpenXT.
+
 ################################################################################
 CHANGELOG 
 ################################################################################
 Ported to SeaBIOS 1.7.5: Eric Chanudet, chanudete@ainfosec.com, 01/03/2015
+Ported to SeaBIOS 1.13.0: Christopher Clark, christopher.w.clark@gmail.com, 2020
 
 ################################################################################
 REMOVAL 
@@ -36,7 +40,7 @@ PATCHES
 ################################################################################
 --- a/src/boot.c
 +++ b/src/boot.c
-@@ -257,6 +257,10 @@ static int DefaultFloppyPrio = 101;
+@@ -423,6 +423,10 @@ static int DefaultFloppyPrio = 101;
  static int DefaultCDPrio     = 102;
  static int DefaultHDPrio     = 103;
  static int DefaultBEVPrio    = 104;
@@ -47,7 +51,7 @@ PATCHES
  
  void
  boot_init(void)
-@@ -277,10 +281,10 @@ boot_init(void)
+@@ -443,10 +447,10 @@ boot_init(void)
              u32 val = bootorder & 0x0f;
              bootorder >>= 4;
              switch (val) {
@@ -62,7 +66,7 @@ PATCHES
              }
          }
      }
-@@ -363,47 +367,56 @@ static inline int defPrio(int priority,
+@@ -530,38 +534,45 @@ static inline int defPrio(int priority, int defaultprio) {
  void
  boot_add_bev(u16 seg, u16 bev, u16 desc, int prio)
  {
@@ -112,8 +116,19 @@ PATCHES
  void
  boot_add_cd(struct drive_s *drive, const char *desc, int prio)
  {
++#if 0
+     if (GET_GLOBAL(PlatformRunningOn) & PF_QEMU) {
+         // We want short boot times.  But on physical hardware even
+         // the test unit ready can take several seconds.  So do media
+@@ -572,15 +583,21 @@ boot_add_cd(struct drive_s *drive, const char *desc, int prio)
+             free(extra);
+         }
+     }
 -    bootentry_add(IPL_TYPE_CDROM, defPrio(prio, DefaultCDPrio)
 -                  , (u32)drive, desc);
++#endif
++    if (!desc)
++        desc = znprintf(MAXDESCSIZE, "%s", "CD/DVD");
 +    if (SelectedCD)
 +        bootentry_add(IPL_TYPE_CDROM, defPrio(prio, DefaultCDPrio)
 +                      , (u32)drive, desc);
@@ -129,7 +144,7 @@ PATCHES
  }
  
  
-@@ -589,9 +602,11 @@ bcv_prepboot(void)
+@@ -802,9 +819,11 @@ bcv_prepboot(void)
          }
      }
  
