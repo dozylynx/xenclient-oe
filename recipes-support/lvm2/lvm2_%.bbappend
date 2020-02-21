@@ -22,6 +22,10 @@ do_install_append() {
     install -m 0644 ${WORKDIR}/volatiles.99_cryptsetup ${D}${sysconfdir}/default/volatiles/99_cryptsetup
 }
 
+ldconfig_postinst_fragment() {
+}
+ALTERNATIVE_lvm2_remove = "lvm.conf"
+
 PACKAGES =+ "${PN}-conf"
 RRECOMMENDS_${PN}_append += "${PN}-conf"
 
