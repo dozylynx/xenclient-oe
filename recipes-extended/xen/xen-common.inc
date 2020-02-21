@@ -1,4 +1,4 @@
-FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
+FILESEXTRAPATHS_prepend := "${THISDIR}/../../../meta-virtualization/recipes-extended/xen/files:${THISDIR}/files:"
 
 # XSA patches take precedence and belong at the head of the queue.
 # This ensures that any collisions with other patches get addressed
@@ -6,9 +6,12 @@ FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
 
 SRC_URI_append = " \
     file://defconfig \
+    file://0001-python-pygrub-pass-DISTUTILS-xen.4.12.patch \
     file://0001-tools-xen-foreign-Update-python-scripts-to-be-Py3-co.patch \
     file://0001-libxl-make-python-scripts-work-with-python-2.6-and-u.patch \
     file://0001-tools-ocaml-make-python-scripts-2-and-3-compatible.patch \
+    file://xen-tools-pygrub-change-tabs-into-spaces.patch \
+    file://xen-tools-pygrub-py3.patch \
     file://kconfig-grant-table.patch \
     file://kconfig-grant-table-v2-interface.patch \
     file://kconfig-grant-table-exotic.patch \
@@ -116,7 +119,6 @@ SRC_URI_append = " \
     file://ocamlfind-static.patch \
     file://0001-python-fix-Wsign-compare-warnings.patch \
     file://0001-pygrub-fsimage-drop-unused-struct.patch \
-    file://0001-pygrub-fsimage-make-it-work-with-python-3.patch \
 "
 
 PACKAGECONFIG =+ "xsm"
