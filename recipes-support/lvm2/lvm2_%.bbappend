@@ -6,6 +6,10 @@ SRC_URI += " \
     file://volatiles.99_cryptsetup \
 "
 
+# OpenXT does not use LVM thin-provisioning and dropping this dependency
+# accelerates the build by avoiding a lengthy compilation of boost.
+PACKAGECONFIG_remove = "thin-provisioning-tools"
+
 # meta-oe recipe will already _append the autotools do_install(), and
 # do_<something>_append() cannot be overridden...
 # So instead, overwrite the files since this is a bbappend it should be done
