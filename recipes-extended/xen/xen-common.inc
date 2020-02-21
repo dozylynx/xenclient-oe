@@ -1,4 +1,4 @@
-FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
+FILESEXTRAPATHS_prepend := "${THISDIR}/../../../meta-virtualization/recipes-extended/xen/files:${THISDIR}/files:"
 
 # XSA patches take precedence and belong at the head of the queue.
 # This ensures that any collisions with other patches get addressed
