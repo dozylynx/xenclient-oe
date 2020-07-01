@@ -36,7 +36,8 @@ do_deploy() {
     do
         install -m 0644 "${WORKDIR}/${f}" "${DEPLOYDIR}/netboot/${f}"
     done
-
+    tar --exclude=./install --transform=s/run.installer/run/ \
+        -C "${D}" -cjf "${DEPLOYDIR}/control.tar.bz2"
 }
 addtask do_deploy after do_install before do_build
 
